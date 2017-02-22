@@ -53,11 +53,12 @@ Bootstrapped generates confidence intervals given input data by:
 * Use this as the 95% confidence interval
 
 For more information please see:
+
 1. [Bootstrap confidence intervals](https://ocw.mit.edu/courses/mathematics/18-05-introduction-to-probability-and-statistics-spring-2014/readings/MIT18_05S14_Reading24.pdf) (good intro)
-1. [An introduction to Bootstrap Methods](http://www.stat-athens.aueb.gr/~karlis/lefkada/boot.pdf)
-1. [When the bootstrap dosen't work](http://notstatschat.tumblr.com/post/156650638586/when-the-bootstrap-doesnt-work)
-1. (book) [An Introduction to the Bootstrap](https://www.amazon.com/Introduction-Bootstrap-Monographs-Statistics-Probability/dp/0412042312/)
-1. (book) [Bootstrap Methods and their Application](https://www.amazon.com/Bootstrap-Application-Statistical-Probabilistic-Mathematics-ebook/dp/B00D2WQ02U/)
+2. [An introduction to Bootstrap Methods](http://www.stat-athens.aueb.gr/~karlis/lefkada/boot.pdf)
+3. [When the bootstrap dosen't work](http://notstatschat.tumblr.com/post/156650638586/when-the-bootstrap-doesnt-work)
+4. (book) [An Introduction to the Bootstrap](https://www.amazon.com/Introduction-Bootstrap-Monographs-Statistics-Probability/dp/0412042312/)
+5. (book) [Bootstrap Methods and their Application](https://www.amazon.com/Bootstrap-Application-Statistical-Probabilistic-Mathematics-ebook/dp/B00D2WQ02U/)
 
 See the CONTRIBUTING file for how to help out.
 
