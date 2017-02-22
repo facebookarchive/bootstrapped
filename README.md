@@ -27,10 +27,10 @@ print bs.bootstrap(samples, stat_func=bs_stats.mean)
 print bs.bootstrap(samples, stat_func=bs_stats.std)
 >> BootstrapResults(lower_bound=9.49, value=9.92, upper_bound=10.36)
 ```
-
-[Bootstrap Intro](https://github.com/facebookincubator/bootstrapped/blob/master/examples/bootstrap_intro.ipynb)
-
-[Bootstrap A/B Testing](https://github.com/facebookincubator/bootstrapped/blob/master/examples/bootstrap_ab_testing.ipynb)
+#### Extended Examples
+* [Bootstrap Intro](https://github.com/facebookincubator/bootstrapped/blob/master/examples/bootstrap_intro.ipynb)
+* [Bootstrap A/B Testing](https://github.com/facebookincubator/bootstrapped/blob/master/examples/bootstrap_ab_testing.ipynb)
+* More notebooks can be found in the [examples/](https://github.com/facebookincubator/bootstrapped/tree/master/examples) diectory
 
 ## Requirements
 **bootstrapped** requires numpy and pandas. The power analysis plotting function requires matplotlib. statsmodels is used in some of the examples.
