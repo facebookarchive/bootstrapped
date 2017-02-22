@@ -1,6 +1,6 @@
 # bootstrapped - confidence intervals made easy
 
-**bootstrapped** is a python library that allows you to build confidence intervals from data. This is useful in a variety of contexts - including during ad-hoc a/b test analysis.
+**bootstrapped** is a Python library that allows you to build confidence intervals from data. This is useful in a variety of contexts - including during ad-hoc a/b test analysis.
 
 ## bootstrapped - Benefits
  * Efficient computation of percentile based confidence intervals
@@ -22,15 +22,15 @@ population = np.random.normal(loc=mean, scale=stdev, size=50000)
 samples = population[:1000]
 
 print bs.bootstrap(samples, stat_func=bs_stats.mean)
->> BootstrapResults(lower_bound=99.46, value=100.08, upper_bound=100.69)
+>> 100.08  (99.46, 100.69)
 
 print bs.bootstrap(samples, stat_func=bs_stats.std)
->> BootstrapResults(lower_bound=9.49, value=9.92, upper_bound=10.36)
+>> 9.49  (9.92, 10.36)
 ```
 #### Extended Examples
 * [Bootstrap Intro](https://github.com/facebookincubator/bootstrapped/blob/master/examples/bootstrap_intro.ipynb)
 * [Bootstrap A/B Testing](https://github.com/facebookincubator/bootstrapped/blob/master/examples/bootstrap_ab_testing.ipynb)
-* More notebooks can be found in the [examples/](https://github.com/facebookincubator/bootstrapped/tree/master/examples) diectory
+* More notebooks can be found in the [examples/](https://github.com/facebookincubator/bootstrapped/tree/master/examples) directory 
 
 ## Requirements
 **bootstrapped** requires numpy and pandas. The power analysis plotting function requires matplotlib. statsmodels is used in some of the examples.
