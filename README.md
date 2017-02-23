@@ -21,10 +21,10 @@ population = np.random.normal(loc=mean, scale=stdev, size=50000)
 # take 1k 'samples' from the larger population
 samples = population[:1000]
 
-print bs.bootstrap(samples, stat_func=bs_stats.mean)
+print(bs.bootstrap(samples, stat_func=bs_stats.mean))
 >> 100.08  (99.46, 100.69)
 
-print bs.bootstrap(samples, stat_func=bs_stats.std)
+print(bs.bootstrap(samples, stat_func=bs_stats.std))
 >> 9.49  (9.92, 10.36)
 ```
 #### Extended Examples
