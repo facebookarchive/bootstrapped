@@ -11,7 +11,6 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import numpy as _np
-import warnings as _warnings
 
 
 class BootstrapResults(object):
@@ -51,9 +50,17 @@ class BootstrapResults(object):
         return self._apply(float(other), lambda x, other: x * other)
 
 
-def _get_alpha_percentiles(alpha):
-    return [100 * (alpha / 2.), 50, 100 * (1 - alpha / 2.)]
+def _get_confidence_interval(results, stat_val, alpha, is_pivotal):
+    if is_pivotal:
+        low = 2 * stat_val - _np.percentile(results, 100 * (1 - alpha / 2.))
+        val = stat_val
+        high = 2 * stat_val - _np.percentile(results, 100 * (alpha / 2.))
+    else:
+        low = _np.percentile(results, 100 * (alpha / 2.))
+        val = _np.percentile(results, 50)
+        high = _np.percentile(results, 100 * (1 - alpha / 2.))
 
+    return BootstrapResults(low, val, high)
 
 def _generate_distributions(size, num_iterations):
     # randomly sample value with replacement
@@ -62,7 +69,6 @@ def _generate_distributions(size, num_iterations):
         (num_iterations, size),
         replace=True,
     )
-
 
 def _compute_stat(num, denom, stat_func, sel=None):
     if sel is not None:
@@ -78,7 +84,7 @@ def _compute_stat(num, denom, stat_func, sel=None):
 
 def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
               num_iterations=10000, iteration_batch_size=None,
-              return_bootstrap_distribution=False):
+              return_bootstrap_distribution=False, is_pivotal=True):
     '''Returns bootstrap estimate.
     Args:
         values: numpy array of values to bootstrap
@@ -111,15 +117,12 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
             the code will produce sets of len(values) x iteration_batch_size
             (one at a time) until num_iterations have been simulated.
         return_bootstrap_distribution: Return the bootstrap distribution instead
-             of a BootstrapResults object.
+            of a BootstrapResults object.
+        is_pivotal: if true, use the pivotal method for bootstrapping confidence
+            intervals. If false, use the percentile method.
     Returns:
         BootstrapResults representing CI and estimated value.
     '''
-    if len(values) < 3000:
-        _warnings.warn(('This code was designed to work on a large number of '
-                        'input samples.\nA heuristic is to have at least 3k '
-                        'values.'))
-
     if iteration_batch_size is None:
         iteration_batch_size = num_iterations
 
@@ -137,16 +140,17 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
     if return_bootstrap_distribution:
         return _np.array(results)
     else:
-        percentiles = _get_alpha_percentiles(alpha)
-
-        # take the confidence interval
-        return BootstrapResults(*_np.percentile(results, percentiles))
-
+        value = _compute_stat(
+            _np.array([values]),
+            _np.array([denominator_values]) if denominator_values is not None else None,
+            stat_func
+        )[0]
+        return _get_confidence_interval(results, value, alpha, is_pivotal)
 
 def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
                  ctrl_denominator=None, alpha=0.05, num_iterations=10000,
                  iteration_batch_size=None, scale_test_by=1.0,
-                 return_bootstrap_distribution=False):
+                 return_bootstrap_distribution=False, is_pivotal=True):
     '''Returns bootstrap confidence intervals for an A/B test.
 
     Args:
@@ -188,15 +192,12 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
             50/50 split. Defaults to 1.0.
         return_bootstrap_distribution: Return the bootstrap distribution instead
              of a BootstrapResults object.
+        is_pivotal: if true, use the pivotal method for bootstrapping confidence
+            intervals. If false, use the percentile method.
 
     Returns:
         BootstrapResults representing CI and estimated value.
     '''
-    if len(test) < 3000 or len(ctrl) < 3000:
-        _warnings.warn(('This code was designed to work on a large number of '
-                        'input samples.\nA heuristic is to have at least 3k '
-                        'values in both test and ctrl.'))
-
     if (test_denominator is not None) ^ (ctrl_denominator is not None):
         raise ValueError(('test_denominator and ctrl_denominator must both '
                           'be specified'))
@@ -222,7 +223,18 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
     if return_bootstrap_distribution:
         return _np.array(results)
     else:
-        percentiles = _get_alpha_percentiles(alpha)
 
-        # take the confidence interval
-        return BootstrapResults(*_np.percentile(results, percentiles))
+        t = _compute_stat(
+            _np.array([test]),
+            _np.array([test_denominator]) if test_denominator is not None else None,
+            stat_func,
+        )[0]
+
+        c = _compute_stat(
+            _np.array([ctrl]),
+            _np.array([ctrl_denominator]) if ctrl_denominator is not None else None,
+            stat_func,
+        )[0]
+
+        value = compare_func(t * scale_test_by, c)
+        return _get_confidence_interval(results, value, alpha, is_pivotal)

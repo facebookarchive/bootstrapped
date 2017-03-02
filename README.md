@@ -2,8 +2,11 @@
 
 **bootstrapped** is a Python library that allows you to build confidence intervals from data. This is useful in a variety of contexts - including during ad-hoc a/b test analysis.
 
-## Motivating Example
-Imagine we own a website and think changing the color of a 'subscribe' button will improve signups. One method to measure the improvement is to conduct an A/B test where we show 50% of people the old version and 50% of the people the new version. We can use a method called 'the bootstrap' to understand how much the button color improves responses and give us the error bars associated with the test - this will give us lower and upper bounds on how good we should expect the change to be!
+## Motivating Example - A/B Test
+Imagine we own a website and think changing the color of a 'subscribe' button will improve signups. One method to measure the improvement is to conduct an A/B test where we show 50% of people the old version and 50% of the people the new version. We can use the bootstrap to understand how much the button color improves responses and give us the error bars associated with the test - this will give us lower and upper bounds on how good we should expect the change to be!
+
+## The Gist - Mean of a Sample
+Given a sample of data - we can generate a bunch of new samples by 're-sampling' from what we have gathered. We calculate the mean for each generated sample. We can use the means from the generated samples to understand the variation in the larger population and can construct error bars for the true mean.
 
 ## bootstrapped - Benefits
  * Efficient computation of confidence intervals
@@ -47,13 +50,7 @@ python setup.py install
 ```
 
 ## How bootstrapped works
-tldr - Percentile based confidence intervals based on bootstrap re-sampling with replacement.
-
-Bootstrapped generates confidence intervals given input data by:
-* Generating a large number of samples from the input (re-sampling)
-* For each re-sample, calculate the mean (or whatever statistic you care about)
-* Of these results, calculate the 2.5th and 97.5 percentiles (default range)
-* Use this as the 95% confidence interval
+**bootstrapped** provides pivotal (aka emperical) based confidence intervals based on bootstrap re-sampling with replacement. The percentile method is also available.
 
 For more information please see:
 
