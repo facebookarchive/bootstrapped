@@ -12,7 +12,7 @@ Given a sample of data - we can generate a bunch of new samples by 're-sampling'
  * Efficient computation of confidence intervals
  * Functions to handle single populations and a/b tests
  * Functions to understand [statistical power](https://en.wikipedia.org/wiki/Statistical_power) 
- * Multithreaded support support to speed-up bootstrap computations
+ * Multithreaded support to speed-up bootstrap computations
 
 ## Example Usage
 ```python
@@ -51,7 +51,7 @@ python setup.py install
 ```
 
 ## How bootstrapped works
-**bootstrapped** provides pivotal (aka emperical) based confidence intervals based on bootstrap re-sampling with replacement. The percentile method is also available.
+**bootstrapped** provides pivotal (aka empirical) based confidence intervals based on bootstrap re-sampling with replacement. The percentile method is also available.
 
 For more information please see:
 
