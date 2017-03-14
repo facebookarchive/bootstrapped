@@ -3,7 +3,7 @@ from distutils.core import setup
 files = []
 
 setup(name = "bootstrapped",
-    version = "0.2",
+    version = "0.21",
     description = "",
     author = "Spencer Beecher",
     author_email = "spencebeecher@gmail.com",

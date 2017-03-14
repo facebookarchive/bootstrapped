@@ -50,25 +50,38 @@ class BootstrapResults(object):
     def __rmul__(self, other):
         return self._apply(float(other), lambda x, other: x * other)
 
-def _get_confidence_interval(results, stat_val, alpha, is_pivotal):
+
+def _get_confidence_interval(bootstrap_dist, stat_val, alpha, is_pivotal):
+    '''Get the bootstrap confidence interval for a given distribution.
+    Args:
+        bootstrap_distribution: numpy array of bootstrap results from
+            bootstrap_distribution() or bootstrap_ab_distribution()
+        stat_val: The overall statistic that this method is attempting to
+            calculate error bars for.
+        alpha: The alpha value for the confidence intervals.
+        is_pivotal: if true, use the pivotal method. if false, use the
+            percentile method.
+    '''
     if is_pivotal:
-        low = 2 * stat_val - _np.percentile(results, 100 * (1 - alpha / 2.))
+        low = 2 * stat_val - _np.percentile(bootstrap_dist, 100 * (1 - alpha / 2.))
         val = stat_val
-        high = 2 * stat_val - _np.percentile(results, 100 * (alpha / 2.))
+        high = 2 * stat_val - _np.percentile(bootstrap_dist, 100 * (alpha / 2.))
     else:
-        low = _np.percentile(results, 100 * (alpha / 2.))
-        val = _np.percentile(results, 50)
-        high = _np.percentile(results, 100 * (1 - alpha / 2.))
+        low = _np.percentile(bootstrap_dist, 100 * (alpha / 2.))
+        val = _np.percentile(bootstrap_dist, 50)
+        high = _np.percentile(bootstrap_dist, 100 * (1 - alpha / 2.))
 
     return BootstrapResults(low, val, high)
 
+
 def _generate_distributions(size, num_iterations):
-    # randomly sample value with replacement
+    # randomly sample records with replacement
     return _np.random.choice(
         size,
         (num_iterations, size),
         replace=True,
     )
+
 
 def _compute_stat(num, denom, stat_func, sel=None):
     if sel is not None:
@@ -82,31 +95,11 @@ def _compute_stat(num, denom, stat_func, sel=None):
     return result
 
 
-def _bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
-               num_iterations=10000, iteration_batch_size=None,
-               return_bootstrap_distribution=False, is_pivotal=True):
-    '''Returns bootstrap estimate.
-    Args:
-        values: numpy array of values to bootstrap
-        stat_func: statistic to bootstrap. We provide several default functions:
-        denominator_values: optional array that does division after the
-            statistic is aggregated. This lets you compute group level division
-            statistics.
-        alpha: alpha value representing the confidence interval.
-            Defaults to 0.05, i.e., 95th-CI.
-        num_iterations: number of bootstrap iterations to run.
-        iteration_batch_size: The bootstrap sample can generate very large
-            matrices. This argument limits the memory footprint by
-            batching bootstrap rounds.
-        return_bootstrap_distribution: Return the bootstrap distribution instead
-            of a BootstrapResults object.
-        is_pivotal: if true, use the pivotal method for bootstrapping confidence
-            intervals. If false, use the percentile method.
-    Returns:
-        BootstrapResults representing CI and estimated value.
+def _bootstrap_sim(values, stat_func, denominator_values, num_iterations,
+                   iteration_batch_size):
+    '''Returns simulated bootstrap distribution.
+    See bootstrap() funciton for arg descriptions.
     '''
-    if iteration_batch_size is None:
-        iteration_batch_size = num_iterations
 
     num_iterations = int(num_iterations)
     iteration_batch_size = int(iteration_batch_size)
@@ -125,9 +118,47 @@ def _bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
     return _np.array(results)
 
 
+def _bootstrap_distribution(values, stat_func, denominator_values,
+                            num_iterations, iteration_batch_size, num_threads):
+    '''Returns the simulated bootstrap distribution computed in (optinally)
+    @num_threads threads. See bootstrap() for arg descriptions.
+
+    Returns:
+        A numpy array of bootstrap simulations.
+    '''
+    if iteration_batch_size is None:
+        iteration_batch_size = num_iterations
+
+    num_iterations = int(num_iterations)
+    iteration_batch_size = int(iteration_batch_size)
+
+    num_threads = int(num_threads)
+
+    if num_threads == -1:
+        num_threads = _multiprocessing.cpu_count()
+
+    if num_threads <= 1:
+        results = _bootstrap_sim(values, stat_func, denominator_values,
+                                 num_iterations, iteration_batch_size)
+    else:
+        pool = _multiprocessing.Pool(num_threads)
+
+        iter_per_job = _np.ceil(num_iterations * 1.0 / num_threads)
+
+        results = []
+        for _ in range(num_threads):
+            r = pool.apply_async(_bootstrap_sim, (values, stat_func,
+                                 denominator_values, iter_per_job,
+                                 iteration_batch_size))
+            results.append(r)
+
+        results = _np.hstack([res.get() for res in results])
+
+    return results
+
+
 def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
               num_iterations=10000, iteration_batch_size=None,
-              return_bootstrap_distribution=False,
               is_pivotal=True, num_threads=1):
     '''Returns bootstrap estimate.
     Args:
@@ -161,8 +192,6 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
             the code will produce sets of len(values) x iteration_batch_size
             (one at a time) until num_iterations have been simulated.
             Defaults to no batching.
-        return_bootstrap_distribution: If True return the bootstrap distribution
-            instead of a BootstrapResults object. Defaults to False.
         is_pivotal: if true, use the pivotal method for bootstrapping confidence
             intervals. If false, use the percentile method.
         num_threads: The number of therads to use. This speeds up calculation of
@@ -171,30 +200,9 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
     Returns:
         BootstrapResults representing CI and estimated value.
     '''
-
-    if num_threads == -1:
-        num_threads = _multiprocessing.cpu_count()
-
-    if num_threads <= 1:
-        results = _bootstrap(values, stat_func, denominator_values, alpha,
-                             num_iterations, iteration_batch_size, is_pivotal)
-    else:
-        pool = _multiprocessing.Pool(num_threads)
-
-        iter_per_job = _np.ceil(num_iterations / num_threads)
-
-        results = []
-        for _ in range(num_threads):
-            r = pool.apply_async(_bootstrap, (values, stat_func,
-                                 denominator_values, alpha, iter_per_job,
-                                 iteration_batch_size, is_pivotal))
-            results.append(r)
-
-        results = _np.hstack([res.get() for res in results])
-
-    if return_bootstrap_distribution:
-        return results
-
+    results = _bootstrap_distribution(values, stat_func, denominator_values,
+                                      num_iterations, iteration_batch_size,
+                                      num_threads)
     value = _compute_stat(
         _np.array([values]),
         _np.array([denominator_values]) if denominator_values is not None else None,
@@ -204,50 +212,16 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
     return _get_confidence_interval(results, value, alpha, is_pivotal)
 
 
-def _bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
-                  ctrl_denominator=None, alpha=0.05, num_iterations=10000,
-                  iteration_batch_size=None, scale_test_by=1.0,
-                  is_pivotal=True):
-    '''Returns bootstrap confidence intervals for an A/B test.
-
-    Args:
-        test: array of test results
-        ctrl: array of ctrl results
-        stat_func: statistic to bootstrap. We provide several default functions:
-        compare_func: Function to compare test and control against.
-        test_denominator: optional array that does division after the statistic
-            is aggregated. This lets you compute group level division
-            statistics.
-            One corresponding entry per record in test.
-        ctrl_denominator: see test_denominator.
-        alpha: alpha value representing the confidence interval.
-            Defaults to 0.05, i.e., 95th-CI.
-        num_iterations: number of bootstrap iterations to run.
-        iteration_batch_size: The bootstrap sample can generate very large
-            matrices. This function iteration_batch_size limits the memory
-            footprint by batching bootstrap rounds.
-        scale_test_by: The ratio between test and control population
-            sizes. Use this if your test and control split is different from a
-            50/50 split. Defaults to 1.0.
-        return_bootstrap_distribution: If true - return the bootstrap
-             distribution instead of a BootstrapResults object.
-        is_pivotal: if true, use the pivotal method for bootstrapping confidence
-            intervals. If false, use the percentile method.
-
-    Returns:
-        A numpy.array of bootstrap simulation results.
-
+def _bootstrap_ab_sim(test, ctrl, stat_func, compare_func, test_denominator,
+                      ctrl_denominator, num_iterations, iteration_batch_size,
+                      scale_test_by):
+    '''Returns simulated bootstrap distribution for an a/b test.
+    See bootstrap_ab() funciton for arg descriptions.
     '''
-    if (test_denominator is not None) ^ (ctrl_denominator is not None):
-        raise ValueError(('test_denominator and ctrl_denominator must both '
-                          'be specified'))
-
-    if iteration_batch_size is None:
-        iteration_batch_size = num_iterations
+    results = []
 
     num_iterations = int(num_iterations)
     iteration_batch_size = int(iteration_batch_size)
-    results = []
 
     for rng in range(0, num_iterations, iteration_batch_size):
         max_rng = min(rng + iteration_batch_size, num_iterations) - rng
@@ -265,10 +239,56 @@ def _bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
     return _np.array(results)
 
 
+def _bootstrap_ab_distribution(test, ctrl, stat_func, compare_func,
+                               test_denominator, ctrl_denominator,
+                               num_iterations, iteration_batch_size,
+                               scale_test_by, num_threads):
+    '''Returns the simulated bootstrap distribution computed in (optinally)
+    @num_threads threads. See bootstrap_ab() funciton for arg descriptions.
+
+    Returns:
+        A numpy array of bootstrap a/b test simulations.
+    '''
+    # both test_denominator and ctrl_denominator must be specified at the same
+    # time.
+    if (test_denominator is not None) ^ (ctrl_denominator is not None):
+        raise ValueError(('test_denominator and ctrl_denominator must both '
+                          'be specified'))
+
+    if iteration_batch_size is None:
+        iteration_batch_size = num_iterations
+
+    num_threads = int(num_threads)
+
+    if num_threads == -1:
+        num_threads = _multiprocessing.cpu_count()
+
+    if num_threads <= 1:
+        results = _bootstrap_ab_sim(test, ctrl, stat_func, compare_func,
+                                    test_denominator, ctrl_denominator,
+                                    num_iterations, iteration_batch_size,
+                                    scale_test_by)
+    else:
+        pool = _multiprocessing.Pool(num_threads)
+
+        iter_per_job = _np.ceil(num_iterations * 1.0 / num_threads)
+
+        results = []
+        for _ in range(num_threads):
+            r = pool.apply_async(_bootstrap_ab_sim, (test, ctrl, stat_func,
+                                 compare_func, test_denominator,
+                                 ctrl_denominator, iter_per_job,
+                                 iteration_batch_size, scale_test_by))
+            results.append(r)
+
+        results = _np.hstack([res.get() for res in results])
+
+    return results
+
+
 def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
                  ctrl_denominator=None, alpha=0.05, num_iterations=10000,
                  iteration_batch_size=None, scale_test_by=1.0,
-                 return_bootstrap_distribution=False,
                  is_pivotal=True, num_threads=1):
     '''Returns bootstrap confidence intervals for an A/B test.
 
@@ -309,8 +329,6 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
         scale_test_by: The ratio between test and control population
             sizes. Use this if your test and control split is different from a
             50/50 split. Defaults to 1.0.
-        return_bootstrap_distribution: If true - return the bootstrap
-             distribution instead of a BootstrapResults object.
         is_pivotal: if true, use the pivotal method for bootstrapping confidence
             intervals. If false, use the percentile method.
         num_threads: The number of therads to use. This speeds up calculation of
@@ -321,38 +339,11 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
     '''
     # both test_denominator and ctrl_denominator must be specified at the same
     # time.
-    if (test_denominator is not None) ^ (ctrl_denominator is not None):
-        raise ValueError(('test_denominator and ctrl_denominator must both '
-                          'be specified'))
 
-    if iteration_batch_size is None:
-        iteration_batch_size = num_iterations
-
-    if num_threads == -1:
-        num_threads = _multiprocessing.cpu_count()
-
-    if num_threads <= 1:
-        results = _bootstrap_ab(test, ctrl, stat_func, compare_func,
-                                test_denominator, ctrl_denominator, alpha,
-                                num_iterations, iteration_batch_size,
-                                scale_test_by, is_pivotal)
-    else:
-        pool = _multiprocessing.Pool(num_threads)
-
-        iter_per_job = _np.ceil(num_iterations / num_threads)
-
-        results = []
-        for _ in range(num_threads):
-            r = pool.apply_async(_bootstrap_ab, (test, ctrl, stat_func,
-                                 compare_func, test_denominator,
-                                 ctrl_denominator, alpha, iter_per_job,
-                                 scale_test_by, is_pivotal))
-            results.append(r)
-
-        results = _np.hstack([res.get() for res in results])
-
-    if return_bootstrap_distribution:
-        return results
+    results = _bootstrap_ab_distribution(test, ctrl, stat_func, compare_func,
+                                         test_denominator, ctrl_denominator,
+                                         num_iterations, iteration_batch_size,
+                                         scale_test_by, num_threads)
 
     t = _compute_stat(
         _np.array([test]),

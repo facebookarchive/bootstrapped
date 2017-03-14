@@ -256,3 +256,58 @@ def test_threads(self):
         bsr_thread.upper_bound,
         delta=.1
     )
+
+
+def test_pivotal(self):
+    mean = 100
+    stdev = 10
+
+    test = np.random.normal(loc=mean, scale=stdev, size=500)
+    ctrl = np.random.normal(loc=mean, scale=stdev, size=5000)
+    test = test * 1.1
+
+    bsr = bs.bootstrap_ab(test, ctrl, bs_stats.mean,
+                          bs_compare.percent_change)
+
+    bsr_percent = bs.bootstrap_ab(test, ctrl, bs_stats.mean,
+                                  bs_compare.percent_change,
+                                  is_pivotal=False)
+    self.assertAlmostEqual(
+        bsr.value,
+        bsr_percent.value,
+        delta=.1
+    )
+
+    self.assertAlmostEqual(
+        bsr.lower_bound,
+        bsr_percent.lower_bound,
+        delta=.1
+    )
+
+    self.assertAlmostEqual(
+        bsr.upper_bound,
+        bsr_percent.upper_bound,
+        delta=.1
+    )
+
+    bsr = bs.bootstrap(test, bs_stats.mean)
+
+    bsr_percent = bs.bootstrap(test, bs_stats.mean,
+                               num_threads=10)
+    self.assertAlmostEqual(
+        bsr.value,
+        bsr_percent.value,
+        delta=.1
+    )
+
+    self.assertAlmostEqual(
+        bsr.lower_bound,
+        bsr_percent.lower_bound,
+        delta=.1
+    )
+
+    self.assertAlmostEqual(
+        bsr.upper_bound,
+        bsr_percent.upper_bound,
+        delta=.1
+    )
