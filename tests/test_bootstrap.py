@@ -16,6 +16,7 @@ import bootstrapped.bootstrap as bs
 import bootstrapped.compare_functions as bs_compare
 import bootstrapped.stats_functions as bs_stats
 import scipy.sparse as sparse
+import scipy.stats as st
 
 
 def to_sparse(data):
@@ -381,3 +382,28 @@ class BootstrappedTest(unittest.TestCase):
             bsr_sp.lower_bound,
             delta=.1,
         )
+
+    def test_t_dist(self):
+        mean = 100
+        stdev = 100
+
+        sample_size = [250, 500, 1000, 2500, 3500, 5000, 8000, 10000]
+
+        for i in sample_size:
+            samples = np.random.normal(loc=mean, scale=stdev, size=i)
+            bsr = bs.bootstrap(samples, stat_func=bs_stats.mean, alpha=0.05)
+
+            mr = st.t.interval(1 - 0.05, len(samples) - 1, loc=np.mean(samples),
+                               scale=st.sem(samples))
+
+            self.assertAlmostEqual(
+                bsr.lower_bound,
+                mr[0],
+                delta=mr[0] / 100.
+            )
+
+            self.assertAlmostEqual(
+                bsr.upper_bound,
+                mr[1],
+                delta=mr[1] / 100.
+            )

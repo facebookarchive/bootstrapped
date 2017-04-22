@@ -87,9 +87,14 @@ def _generate_distributions(values, num_iterations):
         #    2. resample with replacement the non-zero entries from values
         #          B times
         #    3. create a new sparse array with the B resamples, zero otherwise
-        data = values.data
 
         results = []
+
+        if values.shape[0] > 1:
+            raise ValueError(('The sparse matrix must have shape 1 row X N '
+                              'columns '))
+
+        data = values.data
 
         pop_size = values.shape[1]
         non_sparse_size = data.shape[0]
@@ -113,6 +118,7 @@ def _generate_distributions(values, num_iterations):
 
             results.append(d)
         return _sparse.vstack(results)
+
     elif isinstance(values, _sparse.spmatrix):
         raise ValueError(('The only supported sparse matrix type is '
                           'scipy.sparse.csr_matrix'))
@@ -134,10 +140,13 @@ def _compute_stat(num, denom, stat_func):
 
 
 def _bootstrap_sim(values, stat_func, denominator_values, num_iterations,
-                   iteration_batch_size):
+                   iteration_batch_size, seed):
     '''Returns simulated bootstrap distribution.
     See bootstrap() funciton for arg descriptions.
     '''
+
+    if seed is not None:
+        _np.random.seed(seed)
 
     num_iterations = int(num_iterations)
     iteration_batch_size = int(iteration_batch_size)
@@ -178,20 +187,22 @@ def _bootstrap_distribution(values, stat_func, denominator_values,
 
     if num_threads <= 1:
         results = _bootstrap_sim(values, stat_func, denominator_values,
-                                 num_iterations, iteration_batch_size)
+                                 num_iterations, iteration_batch_size, None)
     else:
         pool = _multiprocessing.Pool(num_threads)
 
         iter_per_job = _np.ceil(num_iterations * 1.0 / num_threads)
 
         results = []
-        for _ in range(num_threads):
+        for seed in _np.random.randint(0, 2**32 - 1, num_threads):
             r = pool.apply_async(_bootstrap_sim, (values, stat_func,
                                  denominator_values, iter_per_job,
-                                 iteration_batch_size))
+                                 iteration_batch_size, seed))
             results.append(r)
 
         results = _np.hstack([res.get() for res in results])
+
+        pool.close()
 
     return results
 
@@ -253,10 +264,13 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
 
 def _bootstrap_ab_sim(test, ctrl, stat_func, compare_func, test_denominator,
                       ctrl_denominator, num_iterations, iteration_batch_size,
-                      scale_test_by):
+                      scale_test_by, seed):
     '''Returns simulated bootstrap distribution for an a/b test.
     See bootstrap_ab() funciton for arg descriptions.
     '''
+    if seed is not None:
+        _np.random.seed(seed)
+
     results = []
 
     num_iterations = int(num_iterations)
@@ -309,21 +323,23 @@ def _bootstrap_ab_distribution(test, ctrl, stat_func, compare_func,
         results = _bootstrap_ab_sim(test, ctrl, stat_func, compare_func,
                                     test_denominator, ctrl_denominator,
                                     num_iterations, iteration_batch_size,
-                                    scale_test_by)
+                                    scale_test_by, None)
     else:
         pool = _multiprocessing.Pool(num_threads)
 
         iter_per_job = _np.ceil(num_iterations * 1.0 / num_threads)
 
         results = []
-        for _ in range(num_threads):
+        for seed in _np.random.randint(0, 2**32 - 1, num_threads):
             r = pool.apply_async(_bootstrap_ab_sim, (test, ctrl, stat_func,
                                  compare_func, test_denominator,
                                  ctrl_denominator, iter_per_job,
-                                 iteration_batch_size, scale_test_by))
+                                 iteration_batch_size, scale_test_by, seed))
             results.append(r)
 
         results = _np.hstack([res.get() for res in results])
+
+        pool.close()
 
     return results
 
