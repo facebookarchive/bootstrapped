@@ -14,12 +14,13 @@ import numpy as _np
 import multiprocessing as _multiprocessing
 import scipy.sparse as _sparse
 
-
 class BootstrapResults(object):
     def __init__(self, lower_bound, value, upper_bound):
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.value = value
+        if self.lower_bound > self.upper_bound:
+            self.lower_bound, self.upper_bound = self.upper_bound, self.lower_bound
 
     def __str__(self):
         return '{1}    ({0}, {2})'.format(self.lower_bound, self.value,
@@ -51,6 +52,28 @@ class BootstrapResults(object):
     def __rmul__(self, other):
         return self._apply(float(other), lambda x, other: x * other)
 
+    def error_width(self):
+        '''Returns: upper_bound - lower_bound'''
+        return self.upper_bound - self.lower_bound
+
+    def error_fraction(self):
+        '''Returns the error_width / value'''
+        if self.value == 0:
+            return _np.inf
+        else:
+            return self.error_width() / self.value
+
+    def is_significant(self):
+        return _np.sign(self.upper_bound) == _np.sign(self.lower_bound)
+
+    def get_result(self):
+        '''Returns:
+            -1 if statistically significantly negative
+            +1 if statistically significantly positive
+            0 otherwise
+        '''
+        return int(self.is_significant()) * _np.sign(self.value)
+
 
 def _get_confidence_interval(bootstrap_dist, stat_val, alpha, is_pivotal):
     '''Get the bootstrap confidence interval for a given distribution.
@@ -75,10 +98,51 @@ def _get_confidence_interval(bootstrap_dist, stat_val, alpha, is_pivotal):
     return BootstrapResults(low, val, high)
 
 
-def _generate_distributions(values, num_iterations):
-    if values is None:
-        return None
-    if isinstance(values, _sparse.csr_matrix):
+def _needs_sparse_unification(values_lists):
+    non_zeros = values_lists[0] != 0
+
+    for v in values_lists:
+        v_nz = v != 0
+        non_zeros = (non_zeros + v_nz) > 0
+
+    non_zero_size = non_zeros.sum()
+
+    for v in values_lists:
+        if non_zero_size != v.data.shape[0]:
+            return True
+
+    return False
+
+
+def _validate_arrays(values_lists):
+    t = values_lists[0]
+    t_type = type(t)
+    if not isinstance(t, _sparse.csr_matrix) and not isinstance(t, _np.ndarray):
+        raise ValueError(('The arrays must either be of type '
+                          'scipy.sparse.csr_matrix or numpy.array'))
+
+    for _, values in enumerate(values_lists[1:]):
+        if not isinstance(values, t_type):
+            raise ValueError('The arrays must all be of the same type')
+
+        if t.shape != values.shape:
+            raise ValueError('The arrays must all be of the same shape')
+
+        if isinstance(t, _sparse.csr_matrix):
+            if values.shape[0] > 1:
+                raise ValueError(('The sparse matrix must have shape 1 row X N'
+                                  ' columns'))
+
+    if isinstance(t, _sparse.csr_matrix):
+        if _needs_sparse_unification(values_lists):
+            raise ValueError(('The non-zero entries in the sparse arrays'
+                              ' must be aligned: see '
+                              'bootstrapped.unify_sparse_vectors function'))
+
+
+def _generate_distributions(values_lists, num_iterations):
+
+    if isinstance(values_lists[0], _sparse.csr_matrix):
         # in the sparse case we dont actually need to bootstrap
         # the full sparse array since most values are 0
         # instead for each bootstrap iteration we:
@@ -87,17 +151,10 @@ def _generate_distributions(values, num_iterations):
         #    2. resample with replacement the non-zero entries from values
         #          B times
         #    3. create a new sparse array with the B resamples, zero otherwise
+        results = [[] for _ in range(len(values_lists))]
 
-        results = []
-
-        if values.shape[0] > 1:
-            raise ValueError(('The sparse matrix must have shape 1 row X N '
-                              'columns '))
-
-        data = values.data
-
-        pop_size = values.shape[1]
-        non_sparse_size = data.shape[0]
+        pop_size = values_lists[0].shape[1]
+        non_sparse_size = values_lists[0].data.shape[0]
 
         p = non_sparse_size * 1.0 / pop_size
 
@@ -108,38 +165,32 @@ def _generate_distributions(values, num_iterations):
                 replace=True,
             )
 
-            d = _sparse.csr_matrix(
-                (
-                    data[ids],
-                    (_np.zeros_like(ids), _np.arange(len(ids)))
-                ),
-                shape=(1, pop_size),
-            )
+            for arr, values in zip(results, values_lists):
+                data = values.data
+                d = _sparse.csr_matrix(
+                    (
+                        data[ids],
+                        (_np.zeros_like(ids), _np.arange(len(ids)))
+                    ),
+                    shape=(1, pop_size),
+                )
 
-            results.append(d)
-        return _sparse.vstack(results)
-
-    elif isinstance(values, _sparse.spmatrix):
-        raise ValueError(('The only supported sparse matrix type is '
-                          'scipy.sparse.csr_matrix'))
+                arr.append(d)
+        return [_sparse.vstack(r) for r in results]
 
     else:
+        values_shape = values_lists[0].shape[0]
         ids = _np.random.choice(
-            values.shape[0],
-            (num_iterations, values.shape[0]),
+            values_shape,
+            (num_iterations, values_shape),
             replace=True,
         )
-        return values[ids]
+
+        results = [values[ids] for values in values_lists]
+        return results
 
 
-def _compute_stat(num, denom, stat_func):
-    result = stat_func(num)
-    if denom is not None:
-        result /= stat_func(denom)
-    return result
-
-
-def _bootstrap_sim(values, stat_func, denominator_values, num_iterations,
+def _bootstrap_sim(values_lists, stat_func_lists, num_iterations,
                    iteration_batch_size, seed):
     '''Returns simulated bootstrap distribution.
     See bootstrap() funciton for arg descriptions.
@@ -151,29 +202,53 @@ def _bootstrap_sim(values, stat_func, denominator_values, num_iterations,
     num_iterations = int(num_iterations)
     iteration_batch_size = int(iteration_batch_size)
 
-    results = []
+    results = [[] for _ in values_lists]
 
     for rng in range(0, num_iterations, iteration_batch_size):
         max_rng = min(iteration_batch_size, num_iterations - rng)
 
-        v = _generate_distributions(values, max_rng)
-        d_v = _generate_distributions(denominator_values, max_rng)
+        values_sims = _generate_distributions(values_lists, max_rng)
 
-        stat = _compute_stat(v, d_v, stat_func)
-
-        results.extend(stat)
+        for i, values_sim, stat_func in zip(range(len(values_sims)), values_sims, stat_func_lists):
+            results[i].extend(stat_func(values_sim))
 
     return _np.array(results)
 
 
-def _bootstrap_distribution(values, stat_func, denominator_values,
+def _bootstrap_distribution(values_lists, stat_func_lists,
                             num_iterations, iteration_batch_size, num_threads):
-    '''Returns the simulated bootstrap distribution computed in (optinally)
-    @num_threads threads. See bootstrap() for arg descriptions.
 
+    '''Returns the simulated bootstrap distribution. The idea is to sample the same
+        indexes in a bootstrap re-sample across all arrays passed into values_lists.
+
+        This is especially useful when you want to co-sample records in a ratio metric.
+            numerator[k].sum() / denominator[k].sum()
+        and not
+            numerator[ j ].sum() / denominator[k].sum()
+    Args:
+        values_lists: list of numpy arrays (or scipy.sparse.csr_matrix)
+            each represents a set of values to bootstrap. All arrays in values_lists
+            must be of the same length.
+        stat_func_lists: statistic to bootstrap for each element in values_lists.
+        num_iterations: number of bootstrap iterations / resamples / simulations
+            to perform.
+        iteration_batch_size: The bootstrap sample can generate very large
+            matrices. This argument limits the memory footprint by
+            batching bootstrap rounds. If unspecified the underlying code
+            will produce a matrix of len(values) x num_iterations. If specified
+            the code will produce sets of len(values) x iteration_batch_size
+            (one at a time) until num_iterations have been simulated.
+            Defaults to no batching.
+        num_threads: The number of therads to use. This speeds up calculation of
+            the bootstrap. Defaults to 1. If -1 is specified then
+            multiprocessing.cpu_count() is used instead.
     Returns:
-        A numpy array of bootstrap simulations.
+        The set of bootstrap resamples where each stat_function is applied on
+        the bootsrapped values.
     '''
+
+    _validate_arrays(values_lists)
+
     if iteration_batch_size is None:
         iteration_batch_size = num_iterations
 
@@ -186,7 +261,7 @@ def _bootstrap_distribution(values, stat_func, denominator_values,
         num_threads = _multiprocessing.cpu_count()
 
     if num_threads <= 1:
-        results = _bootstrap_sim(values, stat_func, denominator_values,
+        results = _bootstrap_sim(values_lists, stat_func_lists,
                                  num_iterations, iteration_batch_size, None)
     else:
         pool = _multiprocessing.Pool(num_threads)
@@ -195,8 +270,8 @@ def _bootstrap_distribution(values, stat_func, denominator_values,
 
         results = []
         for seed in _np.random.randint(0, 2**32 - 1, num_threads):
-            r = pool.apply_async(_bootstrap_sim, (values, stat_func,
-                                 denominator_values, iter_per_job,
+            r = pool.apply_async(_bootstrap_sim, (values_lists, stat_func_lists,
+                                 iter_per_job,
                                  iteration_batch_size, seed))
             results.append(r)
 
@@ -208,8 +283,8 @@ def _bootstrap_distribution(values, stat_func, denominator_values,
 
 
 def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
-              num_iterations=10000, iteration_batch_size=None,
-              is_pivotal=True, num_threads=1):
+              num_iterations=10000, iteration_batch_size=None, is_pivotal=True,
+              num_threads=1, return_distribution=False):
     '''Returns bootstrap estimate.
     Args:
         values: numpy array (or scipy.sparse.csr_matrix) of values to bootstrap
@@ -250,106 +325,43 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
     Returns:
         BootstrapResults representing CI and estimated value.
     '''
-    results = _bootstrap_distribution(values, stat_func, denominator_values,
-                                      num_iterations, iteration_batch_size,
-                                      num_threads)
-    value = _compute_stat(
-        values,
-        denominator_values,
-        stat_func
-    )[0]
+    if denominator_values is None:
+        values_lists = [values]
+        stat_func_lists = [stat_func]
 
-    return _get_confidence_interval(results, value, alpha, is_pivotal)
+        def do_division(x):
+            return x
 
-
-def _bootstrap_ab_sim(test, ctrl, stat_func, compare_func, test_denominator,
-                      ctrl_denominator, num_iterations, iteration_batch_size,
-                      scale_test_by, seed):
-    '''Returns simulated bootstrap distribution for an a/b test.
-    See bootstrap_ab() funciton for arg descriptions.
-    '''
-    if seed is not None:
-        _np.random.seed(seed)
-
-    results = []
-
-    num_iterations = int(num_iterations)
-    iteration_batch_size = int(iteration_batch_size)
-
-    for rng in range(0, num_iterations, iteration_batch_size):
-        max_rng = min(rng + iteration_batch_size, num_iterations) - rng
-
-        t_v = _generate_distributions(test, max_rng)
-        t_d_v = _generate_distributions(test_denominator, max_rng)
-
-        c_v = _generate_distributions(ctrl, max_rng)
-        c_d_v = _generate_distributions(ctrl_denominator, max_rng)
-
-        test_stat = _compute_stat(t_v, t_d_v, stat_func)
-        ctrl_stat = _compute_stat(c_v, c_d_v, stat_func)
-
-        stat = compare_func(test_stat * scale_test_by, ctrl_stat)
-
-        results.extend(stat)
-
-    return _np.array(results)
-
-
-def _bootstrap_ab_distribution(test, ctrl, stat_func, compare_func,
-                               test_denominator, ctrl_denominator,
-                               num_iterations, iteration_batch_size,
-                               scale_test_by, num_threads):
-    '''Returns the simulated bootstrap distribution computed in (optinally)
-    @num_threads threads. See bootstrap_ab() funciton for arg descriptions.
-
-    Returns:
-        A numpy array of bootstrap a/b test simulations.
-    '''
-    # both test_denominator and ctrl_denominator must be specified at the same
-    # time.
-    if (test_denominator is not None) ^ (ctrl_denominator is not None):
-        raise ValueError(('test_denominator and ctrl_denominator must both '
-                          'be specified'))
-
-    if iteration_batch_size is None:
-        iteration_batch_size = num_iterations
-
-    num_threads = int(num_threads)
-
-    if num_threads == -1:
-        num_threads = _multiprocessing.cpu_count()
-
-    if num_threads <= 1:
-        results = _bootstrap_ab_sim(test, ctrl, stat_func, compare_func,
-                                    test_denominator, ctrl_denominator,
-                                    num_iterations, iteration_batch_size,
-                                    scale_test_by, None)
+        stat_val = stat_func(values)[0]
     else:
-        pool = _multiprocessing.Pool(num_threads)
+        values_lists = [values, denominator_values]
+        stat_func_lists = [stat_func] * 2
 
-        iter_per_job = _np.ceil(num_iterations * 1.0 / num_threads)
+        def do_division(num, denom):
+            return num / denom
 
-        results = []
-        for seed in _np.random.randint(0, 2**32 - 1, num_threads):
-            r = pool.apply_async(_bootstrap_ab_sim, (test, ctrl, stat_func,
-                                 compare_func, test_denominator,
-                                 ctrl_denominator, iter_per_job,
-                                 iteration_batch_size, scale_test_by, seed))
-            results.append(r)
+        stat_val = stat_func(values)[0] / stat_func(denominator_values)[0]
 
-        results = _np.hstack([res.get() for res in results])
+    distribution_results = _bootstrap_distribution(values_lists,
+                                                   stat_func_lists,
+                                                   num_iterations,
+                                                   iteration_batch_size,
+                                                   num_threads)
 
-        pool.close()
+    bootstrap_dist = do_division(*distribution_results)
 
-    return results
+    if return_distribution:
+        return bootstrap_dist
+    else:
+        return _get_confidence_interval(bootstrap_dist, stat_val, alpha,
+                                        is_pivotal)
 
 
 def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
                  ctrl_denominator=None, alpha=0.05, num_iterations=10000,
                  iteration_batch_size=None, scale_test_by=1.0,
-                 is_pivotal=True, num_threads=1):
+                 is_pivotal=True, num_threads=1, return_distribution=False):
     '''Returns bootstrap confidence intervals for an A/B test.
-
     Args:
         test: numpy array (or scipy.sparse.csr_matrix) of test results
         ctrl: numpy array (or scipy.sparse.csr_matrix) of ctrl results
@@ -367,7 +379,6 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
             statistics. One corresponding entry per record in test.
             Example:
                 SUM(value) / SUM(denom) instead of MEAN(value / denom)
-
                 Ex. Cost Per Click
                 cost per click across a group  (clicks is denominator)
                     SUM(revenue) / SUM(clicks)
@@ -395,25 +406,55 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
     Returns:
         BootstrapResults representing CI and estimated value.
     '''
-    # both test_denominator and ctrl_denominator must be specified at the same
-    # time.
 
-    results = _bootstrap_ab_distribution(test, ctrl, stat_func, compare_func,
-                                         test_denominator, ctrl_denominator,
-                                         num_iterations, iteration_batch_size,
-                                         scale_test_by, num_threads)
+    both_denominators = test_denominator is not None and \
+            ctrl_denominator is not None
+    both_numerators = test is not None and ctrl is not None
 
-    t = _compute_stat(
-        test,
-        test_denominator,
-        stat_func,
-    )[0]
+    if both_numerators and not both_denominators:
+        test_lists = [test]
+        ctrl_lists = [ctrl]
+        stat_func_lists = [stat_func]
 
-    c = _compute_stat(
-        ctrl,
-        ctrl_denominator,
-        stat_func,
-    )[0]
+        def do_division(x):
+            return x
 
-    value = compare_func(t * scale_test_by, c)
-    return _get_confidence_interval(results, value, alpha, is_pivotal)
+        test_val = stat_func(test)[0]
+        ctrl_val = stat_func(ctrl)[0]
+
+    elif both_numerators and both_denominators:
+        test_lists = [test, test_denominator]
+        ctrl_lists = [ctrl, ctrl_denominator]
+        stat_func_lists = [stat_func] * 2
+
+        def do_division(num, denom):
+            return num / denom
+
+        test_val = stat_func(test)[0] / stat_func(test_denominator)[0]
+        ctrl_val = stat_func(ctrl)[0] / stat_func(ctrl_denominator)[0]
+
+    elif not both_numerators:
+        raise ValueError('Both test and ctrl numerators must be specified.')
+    else:
+        raise ValueError('Both test and ctrl denominators must be specified.')
+
+    test_results = _bootstrap_distribution(test_lists, stat_func_lists,
+                                           num_iterations, iteration_batch_size,
+                                           num_threads)
+
+    ctrl_results = _bootstrap_distribution(ctrl_lists, stat_func_lists,
+                                           num_iterations, iteration_batch_size,
+                                           num_threads)
+
+    test_dist = do_division(*test_results)
+    ctrl_dist = do_division(*ctrl_results)
+
+    test_ctrl_dist = compare_func(test_dist * scale_test_by, ctrl_dist)
+
+    if return_distribution:
+        return test_ctrl_dist
+    else:
+
+        test_ctrl_val = compare_func(test_val * scale_test_by, ctrl_val)
+        return _get_confidence_interval(test_ctrl_dist, test_ctrl_val, alpha,
+                                        is_pivotal)

@@ -31,6 +31,19 @@ class BootstrappedTest(unittest.TestCase):
         import warnings
         warnings.filterwarnings('ignore')
 
+    def test_bootstrap_results(self):
+        bsr = bs.BootstrapResults(-1, 0, 1)
+        self.assertEqual(bsr.error_width(), 2)
+        self.assertEqual(bsr.error_fraction(), np.inf)
+        self.assertEqual((bsr + 1).error_fraction(), 2)
+
+        self.assertEqual(bsr.is_significant(), False)
+        self.assertEqual((bsr + 2).is_significant(), True)
+        self.assertEqual((bsr - 2).is_significant(), True)
+        self.assertEqual(bsr.get_result(), 0)
+        self.assertEqual((bsr + 2).get_result(), 1)
+        self.assertEqual((bsr - 2).get_result(), -1)
+
     def test_result_math(self):
         mean = 100
         stdev = 10
