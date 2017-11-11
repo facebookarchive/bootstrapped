@@ -41,7 +41,7 @@ def _get_power_df(bootstrap_result_list):
 
     df = _pd.DataFrame.from_dict([x.__dict__ for x in bootstrap_result_list])
 
-    df = df.sort('value').reset_index().dropna()
+    df = df.sort_values(by=['value']).reset_index().dropna()
 
     is_sig = df['upper_bound'].apply(_np.sign)
     is_sig = is_sig == df['lower_bound'].apply(_np.sign)
