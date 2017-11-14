@@ -36,3 +36,11 @@ def std(values, axis=1):
         return ret.A1
     else:
         return _np.std(_np.asmatrix(values), axis=axis).A1
+    
+def median(values, axis=1):
+    '''Returns the sum of each row of a matrix'''
+    if isinstance(values, _sparse.csr_matrix):
+        ret = values.median(axis=axis)
+        return ret.A1
+    else:
+        return _np.median(_np.asmatrix(values), axis=axis).A1    
