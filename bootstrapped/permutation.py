@@ -10,9 +10,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-from sympy.utilities.iterables import multiset_permutations
 import numpy as _np
 import multiprocessing as _multiprocessing
+from warnings import warn
+
+MAX_ITER = 10000
+MAX_ARRAY_SIZE = 10000
 
 # Randomized permutation shuffle test
 def _get_permutation_result(permutation_dist, stat_val):
@@ -44,19 +47,15 @@ def _validate_arrays(values_lists):
         if t.shape != values.shape:
             raise ValueError('The arrays must all be of the same shape')
 
-def _generate_distributions(values_lists, num_iterations=0, exact=False):
+def _generate_distributions(values_lists, num_iterations=0):
     values_shape = values_lists[0].shape[0]
-    ids = []
-    if exact:
-        ids = list(multiset_permutations(list(range(values_shape))))
-    else:
-        ids = _np.array([_np.random.choice(values_shape, values_shape, replace=False) for i in range(num_iterations)])
+    ids = _np.array([_np.random.choice(values_shape, values_shape, replace=False) for i in range(num_iterations)])
 
     results = [values[ids] for values in values_lists]
     return results
 
 def _permutation_sim(test_lists, ctrl_lists, stat_func_lists, num_iterations,
-                   iteration_batch_size, seed, exact=False):
+                   iteration_batch_size, seed):
     '''Returns simulated permutation distribution.
     See permutation() function for arg descriptions.
     '''
@@ -75,8 +74,11 @@ def _permutation_sim(test_lists, ctrl_lists, stat_func_lists, num_iterations,
     ctrl_results = [[] for _ in ctrl_lists]
     test_sims = [[] for _ in test_lists]
     ctrl_sims = [[] for _ in ctrl_lists]
-    if exact:
-        values_sims = _generate_distributions(values_lists, exact=exact)
+
+    for rng in range(0, num_iterations, iteration_batch_size):
+        max_rng = min(iteration_batch_size, num_iterations - rng)
+
+        values_sims = _generate_distributions(values_lists, max_rng)
         for i,result in enumerate(values_sims):
             for j in result:
                 test_sims[i].append(j[0:len(test_lists[0])])
@@ -87,26 +89,11 @@ def _permutation_sim(test_lists, ctrl_lists, stat_func_lists, num_iterations,
 
         for i, ctrl_sim, stat_func in zip(range(len(ctrl_sims)), ctrl_sims, stat_func_lists):
             ctrl_results[i].extend(stat_func(ctrl_sim))
-    else:
-        for rng in range(0, num_iterations, iteration_batch_size):
-            max_rng = min(iteration_batch_size, num_iterations - rng)
-
-            values_sims = _generate_distributions(values_lists, max_rng)
-            for i,result in enumerate(values_sims):
-                for j in result:
-                    test_sims[i].append(j[0:len(test_lists[0])])
-                    ctrl_sims[i].append(j[len(test_lists[0]):])
-
-            for i, test_sim, stat_func in zip(range(len(test_sims)), test_sims, stat_func_lists):
-                test_results[i].extend(stat_func(test_sim))
-
-            for i, ctrl_sim, stat_func in zip(range(len(ctrl_sims)), ctrl_sims, stat_func_lists):
-                ctrl_results[i].extend(stat_func(ctrl_sim))
 
     return _np.array(test_results), _np.array(ctrl_results)
 
 def _permutation_distribution(test_lists, ctrl_lists, stat_func_lists,
-                            num_iterations, iteration_batch_size, num_threads, exact):
+                            num_iterations, iteration_batch_size, num_threads):
 
     '''Returns the simulated permutation distribution. The idea is to sample the same
         indexes in a permutation shuffle across all arrays passed into values_lists.
@@ -151,9 +138,9 @@ def _permutation_distribution(test_lists, ctrl_lists, stat_func_lists,
     if num_threads == -1:
         num_threads = _multiprocessing.cpu_count()
 
-    if num_threads <= 1 or exact:
+    if num_threads <= 1:
         test_results, ctrl_results = _permutation_sim(test_lists, ctrl_lists, stat_func_lists,
-                                                      num_iterations, iteration_batch_size, None, exact)
+                                                      num_iterations, iteration_batch_size, None)
     else:
         pool = _multiprocessing.Pool(num_threads)
 
@@ -178,7 +165,7 @@ def _permutation_distribution(test_lists, ctrl_lists, stat_func_lists,
 def permutation_test(test, ctrl, stat_func, compare_func, test_denominator=None,
                  ctrl_denominator=None, num_iterations=10000,
                  iteration_batch_size=None,
-                 num_threads=1, return_distribution=False, exact=False):
+                 num_threads=1, return_distribution=False):
     '''Returns bootstrap confidence intervals for an A/B test.
     Args:
         test: numpy array (or scipy.sparse.csr_matrix) of test results
@@ -214,11 +201,14 @@ def permutation_test(test, ctrl, stat_func, compare_func, test_denominator=None,
         num_threads: The number of therads to use. This speeds up calculation of
             the bootstrap. Defaults to 1. If -1 is specified then
             multiprocessing.cpu_count() is used instead.
-        exact: True to run an exact permutation test.
     Returns:
         percentage representing the percentage of permutation distribution
             values that are more extreme than the original distribution.
     '''
+
+    if (len(test) >= MAX_ARRAY_SIZE or len(ctrl) >= MAX_ARRAY_SIZE) and num_iterations > MAX_ITER:
+        warn(f"Maximum array length of {MAX_ARRAY_SIZE} exceeded, limiting num_iterations to {MAX_ITER}")
+        num_iterations = MAX_ITER
 
     both_denominators = test_denominator is not None and \
             ctrl_denominator is not None
@@ -255,7 +245,7 @@ def permutation_test(test, ctrl, stat_func, compare_func, test_denominator=None,
 
     test_results, ctrl_results = _permutation_distribution(test_lists, ctrl_lists, stat_func_lists,
                                            num_iterations, iteration_batch_size,
-                                           num_threads, exact)
+                                           num_threads)
 
     test_dist = do_division(*test_results)
     ctrl_dist = do_division(*ctrl_results)

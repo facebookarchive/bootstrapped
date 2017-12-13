@@ -13,6 +13,7 @@ from __future__ import unicode_literals
 import unittest
 import numpy as np
 import bootstrapped.bootstrap as bs
+import bootstrapped.permutation as pm
 import bootstrapped.compare_functions as bs_compare
 import bootstrapped.stats_functions as bs_stats
 import scipy.sparse as sparse
@@ -125,6 +126,52 @@ class BootstrappedTest(unittest.TestCase):
             delta=.5
         )
 
+    def test_randomized_permutation(self):
+        ctrl = np.array([54, 51, 58, 44, 55, 52, 42, 47, 58, 46])
+        test = np.array([54, 73, 53, 70, 73, 68, 52, 65, 65])
+
+        pmr = pm.permutation_test(test, ctrl, bs_stats.mean,
+                                   bs_compare.difference, num_iterations=10000)
+        self.assertAlmostEqual(
+            pmr,
+            0.001,
+            delta=0.0015
+        )
+
+        ctrl = np.array([56, 348, 162, 420, 440, 250, 389, 476, 288, 456])
+        test = np.array([69, 361, 175, 433, 453, 263, 402, 489, 301, 469])
+
+        pmr2 = pm.permutation_test(test, ctrl, bs_stats.mean,
+                                   bs_compare.difference, num_iterations=10000)
+        self.assertAlmostEqual(
+            pmr2,
+            0.83,
+            delta=0.005
+        )
+
+        test = np.array([37, 49, 55, 57])
+        ctrl = np.array([23, 31, 46])
+
+        pmr3 = pm.permutation_test(test, ctrl, bs_stats.mean,
+                                   bs_compare.difference, num_iterations=10000)
+        self.assertAlmostEqual(
+            pmr3,
+            0.114,
+            delta=0.01
+        )
+
+        test = np.array([12.6, 11.4, 13.2, 11.2, 9.4, 12.0])
+        ctrl = np.array([16.4, 14.1, 13.4, 15.4, 14.0, 11.3])
+
+        pmr4 = pm.permutation_test(test, ctrl, bs_stats.mean,
+                                   bs_compare.difference, num_iterations=10000)
+
+        self.assertAlmostEqual(
+            pmr4,
+            0.019,
+            delta=0.005
+        )
+
     def test_compare_functions(self):
         self.assertAlmostEqual(
             bs_compare.percent_change(1.1, 1.),
@@ -168,7 +215,25 @@ class BootstrappedTest(unittest.TestCase):
         bsr = bs.bootstrap(samples / denom, bs_stats.mean)
         self.assertAlmostEqual(bsr.value, 50, delta=5)
 
-    def test_batch_size(self):
+    def test_randomized_permutation_ratio(self):
+        test = np.array([126, 114, 132, 112, 94, 120])
+        test_denom = np.ones(6)*10
+        ctrl = np.array([164, 141, 134, 154, 140, 113])
+        ctrl_denom = np.ones(6)*10
+
+        pmr = pm.permutation_test(test, ctrl, bs_stats.mean,
+                                   bs_compare.difference,
+                                   test_denominator=test_denom,
+                                   ctrl_denominator=ctrl_denom,
+                                   num_iterations=10000)
+
+        self.assertAlmostEqual(
+            pmr,
+            0.019,
+            delta=0.002
+        )
+
+    def test_bootstrap_batch_size(self):
         mean = 100
         stdev = 10
 
@@ -222,7 +287,7 @@ class BootstrappedTest(unittest.TestCase):
             delta=.1
         )
 
-    def test_threads(self):
+    def test_bootstrap_threads(self):
         mean = 100
         stdev = 10
 
