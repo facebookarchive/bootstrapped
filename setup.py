@@ -11,9 +11,9 @@ setup(
     packages=['bootstrapped'],
     long_description=readme,
     install_requires=[
-        "matplotlib==1.5.3",
-        "numpy==1.11.1",
-        "pandas==0.18.1",
+        "matplotlib>=1.5.3",
+        "numpy>=1.11.1",
+        "pandas>=0.18.1",
     ],
     url='https://github.com/facebookincubator/bootstrapped',
 )
