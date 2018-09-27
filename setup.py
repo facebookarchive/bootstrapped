@@ -4,7 +4,7 @@ readme = open('README.rst').read()
 
 setup(
     name="bootstrapped",
-    version="0.0.1",
+    version="0.0.2",
     description="Implementations of the percentile based bootstrap",
     author="Spencer Beecher",
     author_email="spencebeecher@gmail.com",
