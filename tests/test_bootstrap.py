@@ -485,3 +485,23 @@ class BootstrappedTest(unittest.TestCase):
                 mr[1],
                 delta=mr[1] / 100.
             )
+
+    def test_input_validation(self):
+        too_many_dims_numpy = np.ones(shape=(2, 2))
+        square_sparse = sparse.csr_matrix(too_many_dims_numpy)
+        self.assertRaises(
+            ValueError,
+            bs.bootstrap_ab,
+            too_many_dims_numpy,
+            too_many_dims_numpy,
+            bs_stats.mean,
+            bs_compare.percent_change
+        )
+        self.assertRaises(
+            ValueError,
+            bs.bootstrap_ab,
+            square_sparse,
+            square_sparse,
+            bs_stats.mean,
+            bs_compare.percent_change
+        )
