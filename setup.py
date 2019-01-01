@@ -1,6 +1,7 @@
 from setuptools import setup
 
-readme = open('README.rst').read()
+with open('README.rst') as f:
+    readme = f.read()
 
 setup(
     name="bootstrapped",
