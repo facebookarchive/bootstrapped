@@ -4,18 +4,18 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
-'Functions that allow one to perform power analysis'
+"""Functions that allow one to perform power analysis"""
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
-import pandas as _pd
-import numpy as _np
 import warnings as _warnings
+import numpy as _np
+import pandas as _pd
 
 
 def _get_power_df(bootstrap_result_list):
-    '''Returns a dataframe with importat statistics for power analysis
+    """Returns a dataframe with important statistics for power analysis
 
     Args:
         bootstrap_result_list: list of BootstrapResults
@@ -32,7 +32,7 @@ def _get_power_df(bootstrap_result_list):
 
 
     power_df = bootstrap.get_power_df(results)
-    '''
+    """
     if len(bootstrap_result_list) < 3000:
         _warnings.warn(('bootstrap_result_list has very few examples. '
                         'A general heuristic is to have at least 3k values. '
@@ -48,7 +48,7 @@ def _get_power_df(bootstrap_result_list):
     df['is_significant'] = is_sig
 
     df['test_result'] = df['upper_bound'].apply(_np.sign).astype(int) \
-            * df['is_significant'].apply(lambda x: 1 if x else 0)
+            * df['is_significant'].apply(bool)
 
     result_cols = [
         'negative_significant',
@@ -66,12 +66,12 @@ def _get_power_df(bootstrap_result_list):
 
 
 def power_stats(bootstrap_result_list):
-    '''Returns summary statistics about a power_df
+    """Returns summary statistics about a power_df
     Args:
-        power_df: get_power_df([BootstrapResult, ...])
+        bootstrap_result_list: list of BootstrapResults
     Returns:
         A dataframe with summary statistics about the power of the simulation.
-    '''
+    """
     power_df = _get_power_df(bootstrap_result_list)
     pcnt_results = power_df.test_result.value_counts() * 100 / len(power_df)
 
@@ -90,9 +90,9 @@ def power_stats(bootstrap_result_list):
 def plot_power(bootstrap_result_list, insignificant_color='blue',
                significant_color='orange', trend_color='black',
                zero_color='black'):
-    '''
+    """
     Args:
-        power_df: get_power_df([BootstrapResult, ...])
+        bootstrap_result_list: list of BootstrapResults
 
     Example:
 
@@ -108,7 +108,7 @@ def plot_power(bootstrap_result_list, insignificant_color='blue',
 
     bootstrap.power_stats(power_df)
     bootstrap.plot_power(power_df)
-    '''
+    """
     import matplotlib.pyplot as plt
 
     power_df = _get_power_df(bootstrap_result_list)

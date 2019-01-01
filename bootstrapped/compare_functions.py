@@ -4,7 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
-'''Various comparison functions for use in bootstrap a/b tests'''
+"""Various comparison functions for use in bootstrap a/b tests"""
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
@@ -19,7 +19,7 @@ def difference(test_stat, ctrl_stat):
     Returns:
         test_stat - ctrl_stat
     """
-    return (test_stat - ctrl_stat)
+    return test_stat - ctrl_stat
 
 
 def percent_change(test_stat, ctrl_stat):
@@ -30,7 +30,7 @@ def percent_change(test_stat, ctrl_stat):
     Returns:
         (test_stat - ctrl_stat) / ctrl_stat * 100
     """
-    return (test_stat - ctrl_stat) * 100.0 / ctrl_stat
+    return (test_stat - ctrl_stat) * 100. / ctrl_stat
 
 
 def ratio(test_stat, ctrl_stat):
@@ -53,4 +53,4 @@ def percent_difference(test_stat, ctrl_stat):
     Returns:
         (test_stat - ctrl_stat) / ((test_stat + ctrl_stat) / 2.0) * 100.0
     """
-    return (test_stat - ctrl_stat) / ((test_stat + ctrl_stat) / 2.0) * 100.0
+    return (test_stat - ctrl_stat) / ((test_stat + ctrl_stat) / 2.) * 100.

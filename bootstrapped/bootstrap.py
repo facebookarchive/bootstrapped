@@ -4,7 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
-'''Functions that allow one to create bootstrapped confidence intervals'''
+"""Functions that allow one to create bootstrapped confidence intervals"""
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
@@ -53,11 +53,11 @@ class BootstrapResults(object):
         return self._apply(float(other), lambda x, other: x * other)
 
     def error_width(self):
-        '''Returns: upper_bound - lower_bound'''
+        """Returns: upper_bound - lower_bound"""
         return self.upper_bound - self.lower_bound
 
     def error_fraction(self):
-        '''Returns the error_width / value'''
+        """Returns the error_width / value"""
         if self.value == 0:
             return _np.inf
         else:
@@ -67,16 +67,16 @@ class BootstrapResults(object):
         return _np.sign(self.upper_bound) == _np.sign(self.lower_bound)
 
     def get_result(self):
-        '''Returns:
+        """Returns:
             -1 if statistically significantly negative
             +1 if statistically significantly positive
             0 otherwise
-        '''
+        """
         return int(self.is_significant()) * _np.sign(self.value)
 
 
 def _get_confidence_interval(bootstrap_dist, stat_val, alpha, is_pivotal):
-    '''Get the bootstrap confidence interval for a given distribution.
+    """Get the bootstrap confidence interval for a given distribution.
     Args:
         bootstrap_distribution: numpy array of bootstrap results from
             bootstrap_distribution() or bootstrap_ab_distribution()
@@ -85,7 +85,7 @@ def _get_confidence_interval(bootstrap_dist, stat_val, alpha, is_pivotal):
         alpha: The alpha value for the confidence intervals.
         is_pivotal: if true, use the pivotal method. if false, use the
             percentile method.
-    '''
+    """
     if is_pivotal:
         low = 2 * stat_val - _np.percentile(bootstrap_dist, 100 * (1 - alpha / 2.))
         val = stat_val
@@ -192,9 +192,9 @@ def _generate_distributions(values_lists, num_iterations):
 
 def _bootstrap_sim(values_lists, stat_func_lists, num_iterations,
                    iteration_batch_size, seed):
-    '''Returns simulated bootstrap distribution.
-    See bootstrap() funciton for arg descriptions.
-    '''
+    """Returns simulated bootstrap distribution.
+    See bootstrap() function for arg descriptions.
+    """
 
     if seed is not None:
         _np.random.seed(seed)
@@ -218,7 +218,7 @@ def _bootstrap_sim(values_lists, stat_func_lists, num_iterations,
 def _bootstrap_distribution(values_lists, stat_func_lists,
                             num_iterations, iteration_batch_size, num_threads):
 
-    '''Returns the simulated bootstrap distribution. The idea is to sample the same
+    """Returns the simulated bootstrap distribution. The idea is to sample the same
         indexes in a bootstrap re-sample across all arrays passed into values_lists.
 
         This is especially useful when you want to co-sample records in a ratio metric.
@@ -244,8 +244,8 @@ def _bootstrap_distribution(values_lists, stat_func_lists,
             multiprocessing.cpu_count() is used instead.
     Returns:
         The set of bootstrap resamples where each stat_function is applied on
-        the bootsrapped values.
-    '''
+        the bootstrapped values.
+    """
 
     _validate_arrays(values_lists)
 
@@ -285,7 +285,7 @@ def _bootstrap_distribution(values_lists, stat_func_lists,
 def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
               num_iterations=10000, iteration_batch_size=None, is_pivotal=True,
               num_threads=1, return_distribution=False):
-    '''Returns bootstrap estimate.
+    """Returns bootstrap estimate.
     Args:
         values: numpy array (or scipy.sparse.csr_matrix) of values to bootstrap
         stat_func: statistic to bootstrap. We provide several default functions:
@@ -324,7 +324,7 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
             multiprocessing.cpu_count() is used instead.
     Returns:
         BootstrapResults representing CI and estimated value.
-    '''
+    """
     if denominator_values is None:
         values_lists = [values]
         stat_func_lists = [stat_func]
@@ -361,7 +361,7 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
                  ctrl_denominator=None, alpha=0.05, num_iterations=10000,
                  iteration_batch_size=None, scale_test_by=1.0,
                  is_pivotal=True, num_threads=1, return_distribution=False):
-    '''Returns bootstrap confidence intervals for an A/B test.
+    """Returns bootstrap confidence intervals for an A/B test.
     Args:
         test: numpy array (or scipy.sparse.csr_matrix) of test results
         ctrl: numpy array (or scipy.sparse.csr_matrix) of ctrl results
@@ -400,12 +400,12 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
             50/50 split. Defaults to 1.0.
         is_pivotal: if true, use the pivotal method for bootstrapping confidence
             intervals. If false, use the percentile method.
-        num_threads: The number of therads to use. This speeds up calculation of
+        num_threads: The number of threads to use. This speeds up calculation of
             the bootstrap. Defaults to 1. If -1 is specified then
             multiprocessing.cpu_count() is used instead.
     Returns:
         BootstrapResults representing CI and estimated value.
-    '''
+    """
 
     both_denominators = test_denominator is not None and \
             ctrl_denominator is not None
