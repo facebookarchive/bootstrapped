@@ -30,7 +30,7 @@ def percent_change(test_stat, ctrl_stat):
     Returns:
         (test_stat - ctrl_stat) / ctrl_stat * 100
     """
-    return (test_stat - ctrl_stat) * 100.0 / ctrl_stat
+    return (test_stat - ctrl_stat) * 100.0 / abs(ctrl_stat)
 
 
 def ratio(test_stat, ctrl_stat):
