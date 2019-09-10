@@ -9,7 +9,10 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
-from itertools import izip
+try:
+    from itertools import izip
+except ImportError:
+    izip = zip
 
 import numpy as _np
 import multiprocessing as _multiprocessing
@@ -186,7 +189,7 @@ def _generate_distributions(values_lists, num_iterations):
             (
                 values[_np.random.choice(
                     values_shape, values_shape, replace=True
-                )] for _ in xrange(num_iterations)
+                )] for _ in range(num_iterations)
             ) for values in values_lists
         )
         return results
