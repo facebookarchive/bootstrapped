@@ -9,6 +9,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
+from itertools import izip
 
 import numpy as _np
 import multiprocessing as _multiprocessing
@@ -180,13 +181,14 @@ def _generate_distributions(values_lists, num_iterations):
 
     else:
         values_shape = values_lists[0].shape[0]
-        ids = _np.random.choice(
-            values_shape,
-            (num_iterations, values_shape),
-            replace=True,
-        )
 
-        results = [values[ids] for values in values_lists]
+        results = (
+            (
+                values[_np.random.choice(
+                    values_shape, values_shape, replace=True
+                )] for _ in xrange(num_iterations)
+            ) for values in values_lists
+        )
         return results
 
 
@@ -209,8 +211,11 @@ def _bootstrap_sim(values_lists, stat_func_lists, num_iterations,
 
         values_sims = _generate_distributions(values_lists, max_rng)
 
-        for i, values_sim, stat_func in zip(range(len(values_sims)), values_sims, stat_func_lists):
-            results[i].extend(stat_func(values_sim))
+        for i, (values_sim, stat_func) in enumerate(izip(
+                values_sims, stat_func_lists)):
+            results[i].extend(
+                stat_func(row) for row in values_sim
+            )
 
     return _np.array(results)
 
