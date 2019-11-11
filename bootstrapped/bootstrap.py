@@ -283,7 +283,7 @@ def _bootstrap_distribution(values_lists, stat_func_lists,
 
 
 def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
-              num_iterations=10000, iteration_batch_size=None, is_pivotal=True,
+              num_iterations=10000, iteration_batch_size=10, is_pivotal=True,
               num_threads=1, return_distribution=False):
     '''Returns bootstrap estimate.
     Args:
@@ -316,7 +316,7 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
             will produce a matrix of len(values) x num_iterations. If specified
             the code will produce sets of len(values) x iteration_batch_size
             (one at a time) until num_iterations have been simulated.
-            Defaults to no batching.
+            Defaults to 10. Passing None will calculate the full simulation in one step.
         is_pivotal: if true, use the pivotal method for bootstrapping confidence
             intervals. If false, use the percentile method.
         num_threads: The number of therads to use. This speeds up calculation of
@@ -359,7 +359,7 @@ def bootstrap(values, stat_func, denominator_values=None, alpha=0.05,
 
 def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
                  ctrl_denominator=None, alpha=0.05, num_iterations=10000,
-                 iteration_batch_size=None, scale_test_by=1.0,
+                 iteration_batch_size=10, scale_test_by=1.0,
                  is_pivotal=True, num_threads=1, return_distribution=False):
     '''Returns bootstrap confidence intervals for an A/B test.
     Args:
@@ -394,7 +394,8 @@ def bootstrap_ab(test, ctrl, stat_func, compare_func, test_denominator=None,
             analysis slower.
         iteration_batch_size: The bootstrap sample can generate very large
             arrays. This function iteration_batch_size limits the memory
-            footprint by batching bootstrap rounds.
+            footprint by batching bootstrap rounds. Defaults to 10. Passing None
+            will attempt to calculate the full simulation in one step.
         scale_test_by: The ratio between test and control population
             sizes. Use this if your test and control split is different from a
             50/50 split. Defaults to 1.0.

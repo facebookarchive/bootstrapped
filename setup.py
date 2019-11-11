@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 from setuptools import setup
 
 readme = open('README.rst').read()
@@ -14,6 +16,7 @@ setup(
         "matplotlib>=1.5.3",
         "numpy>=1.11.1",
         "pandas>=0.18.1",
+        "scipy>=0.19.1",
     ],
     url='https://github.com/facebookincubator/bootstrapped',
 )
