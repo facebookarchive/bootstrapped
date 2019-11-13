@@ -25,7 +25,11 @@ def to_sparse(data):
     mat[0, :len(data)] = data
     return mat
 
+
 class BootstrappedTest(unittest.TestCase):
+
+    mean = 100
+    stdev = 10
 
     def setUp(self):
         np.random.seed(1)
@@ -38,18 +42,15 @@ class BootstrappedTest(unittest.TestCase):
         self.assertEqual(bsr.error_fraction(), np.inf)
         self.assertEqual((bsr + 1).error_fraction(), 2)
 
-        self.assertEqual(bsr.is_significant(), False)
-        self.assertEqual((bsr + 2).is_significant(), True)
-        self.assertEqual((bsr - 2).is_significant(), True)
+        self.assertFalse(bsr.is_significant())
+        self.assertTrue((bsr + 2).is_significant())
+        self.assertTrue((bsr - 2).is_significant())
         self.assertEqual(bsr.get_result(), 0)
         self.assertEqual((bsr + 2).get_result(), 1)
         self.assertEqual((bsr - 2).get_result(), -1)
 
     def test_result_math(self):
-        mean = 100
-        stdev = 10
-
-        samples = np.random.normal(loc=mean, scale=stdev, size=5000)
+        samples = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
 
         bsr = bs.bootstrap(samples, bs_stats.mean)
 
@@ -63,10 +64,7 @@ class BootstrappedTest(unittest.TestCase):
         self.assertEqual(2 * bsr.value, (2 * bsr).value)
 
     def test_bootstrap(self):
-        mean = 100
-        stdev = 10
-
-        samples = np.random.normal(loc=mean, scale=stdev, size=5000)
+        samples = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
 
         bsr = bs.bootstrap(samples, bs_stats.mean)
 
@@ -81,11 +79,9 @@ class BootstrappedTest(unittest.TestCase):
         self.assertTrue(bsr.lower_bound < bsr2.lower_bound)
 
     def test_bootstrap_ab(self):
-        mean = 100
-        stdev = 10
 
-        test = np.random.normal(loc=mean, scale=stdev, size=500)
-        ctrl = np.random.normal(loc=mean, scale=stdev, size=5000)
+        test = np.random.normal(loc=self.mean, scale=self.stdev, size=500)
+        ctrl = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
         test = test * 1.1
 
         bsr = bs.bootstrap_ab(test, ctrl, bs_stats.mean,
@@ -112,8 +108,8 @@ class BootstrappedTest(unittest.TestCase):
             delta=.5
         )
 
-        test_denom = np.random.normal(loc=mean, scale=stdev, size=500)
-        ctrl_denom = np.random.normal(loc=mean, scale=stdev, size=5000)
+        test_denom = np.random.normal(loc=self.mean, scale=self.stdev, size=500)
+        ctrl_denom = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
         test_denom = test_denom * 1.1
 
         bsr4 = bs.bootstrap_ab(test, ctrl, bs_stats.mean,
@@ -234,11 +230,8 @@ class BootstrappedTest(unittest.TestCase):
         )
 
     def test_bootstrap_batch_size(self):
-        mean = 100
-        stdev = 10
-
-        test = np.random.normal(loc=mean, scale=stdev, size=500)
-        ctrl = np.random.normal(loc=mean, scale=stdev, size=5000)
+        test = np.random.normal(loc=self.mean, scale=self.stdev, size=500)
+        ctrl = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
         test = test * 1.1
 
         bsr = bs.bootstrap_ab(test, ctrl, bs_stats.mean,
@@ -288,11 +281,8 @@ class BootstrappedTest(unittest.TestCase):
         )
 
     def test_bootstrap_threads(self):
-        mean = 100
-        stdev = 10
-
-        test = np.random.normal(loc=mean, scale=stdev, size=500)
-        ctrl = np.random.normal(loc=mean, scale=stdev, size=5000)
+        test = np.random.normal(loc=self.mean, scale=self.stdev, size=500)
+        ctrl = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
         test = test * 1.1
 
         bsr = bs.bootstrap_ab(test, ctrl, bs_stats.mean,
@@ -342,11 +332,8 @@ class BootstrappedTest(unittest.TestCase):
         )
 
     def test_pivotal(self):
-        mean = 100
-        stdev = 10
-
-        test = np.random.normal(loc=mean, scale=stdev, size=500)
-        ctrl = np.random.normal(loc=mean, scale=stdev, size=5000)
+        test = np.random.normal(loc=self.mean, scale=self.stdev, size=500)
+        ctrl = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
         test = test * 1.1
 
         bsr = bs.bootstrap_ab(test, ctrl, bs_stats.mean,
@@ -396,10 +383,7 @@ class BootstrappedTest(unittest.TestCase):
         )
 
     def test_bootstrap_sparse(self):
-        mean = 100
-        stdev = 10
-
-        samples = np.random.normal(loc=mean, scale=stdev, size=5000)
+        samples = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
         samples_sp = sparse.csr_matrix(samples)
 
         bsr = bs.bootstrap(samples, bs_stats.mean)
@@ -430,11 +414,8 @@ class BootstrappedTest(unittest.TestCase):
         self.assertAlmostEqual(bsr.lower_bound, bsr_sp.lower_bound, delta=.2)
 
     def test_bootstrap_ab_sparse(self):
-        mean = 100
-        stdev = 10
-
-        test = np.random.normal(loc=mean, scale=stdev, size=500)
-        ctrl = np.random.normal(loc=mean, scale=stdev, size=5000)
+        test = np.random.normal(loc=self.mean, scale=self.stdev, size=500)
+        ctrl = np.random.normal(loc=self.mean, scale=self.stdev, size=5000)
         test = test * 1.1
         test_sp = sparse.csr_matrix(test)
         ctrl_sp = sparse.csr_matrix(ctrl)
@@ -462,13 +443,10 @@ class BootstrappedTest(unittest.TestCase):
         )
 
     def test_t_dist(self):
-        mean = 100
-        stdev = 100
-
         sample_size = [250, 500, 1000, 2500, 3500, 5000, 8000, 10000]
 
         for i in sample_size:
-            samples = np.random.normal(loc=mean, scale=stdev, size=i)
+            samples = np.random.normal(loc=self.mean, scale=self.stdev, size=i)
             bsr = bs.bootstrap(samples, stat_func=bs_stats.mean, alpha=0.05)
 
             mr = st.t.interval(1 - 0.05, len(samples) - 1, loc=np.mean(samples),
