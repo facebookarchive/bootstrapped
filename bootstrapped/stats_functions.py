@@ -38,6 +38,7 @@ def median(values, axis=1):
     else:
         return _np.median(_np.asmatrix(values), axis=axis).A1
 
+
 def std(values, axis=1):
     '''Returns the std of each row of a matrix'''
     if isinstance(values, _sparse.csr_matrix):
@@ -45,3 +46,21 @@ def std(values, axis=1):
         return ret.A1
     else:
         return _np.std(_np.asmatrix(values), axis=axis).A1
+
+
+def min(values, axis=1):
+    '''Returns the min of each row of a matrix'''
+    if isinstance(values, _sparse.csr_matrix):
+        ret = values.min(axis=axis)
+        return ret.A1
+    else:
+        return _np.min(_np.asmatrix(values), axis=axis).A1
+
+
+def max(values, axis=1):
+    '''Returns the max of each row of a matrix'''
+    if isinstance(values, _sparse.csr_matrix):
+        ret = values.max(axis=axis)
+        return ret.A1
+    else:
+        return _np.max(_np.asmatrix(values), axis=axis).A1
