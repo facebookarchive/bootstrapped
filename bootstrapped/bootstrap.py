@@ -114,30 +114,38 @@ def _needs_sparse_unification(values_lists):
     return False
 
 
+def _is_sparse_or_array(x):
+    return isinstance(x, _sparse.csr_matrix) or isinstance(x, _np.ndarray)
+
+
 def _validate_arrays(values_lists):
-    t = values_lists[0]
-    t_type = type(t)
-    if not isinstance(t, _sparse.csr_matrix) and not isinstance(t, _np.ndarray):
-        raise ValueError(('The arrays must either be of type '
-                          'scipy.sparse.csr_matrix or numpy.array'))
 
-    for _, values in enumerate(values_lists[1:]):
-        if not isinstance(values, t_type):
-            raise ValueError('The arrays must all be of the same type')
+    if not all(map(_is_sparse_or_array, values_lists)):
+        raise TypeError(('The arrays must either be of type '
+                         'scipy.sparse.csr_matrix or numpy.ndarray'))
 
-        if t.shape != values.shape:
-            raise ValueError('The arrays must all be of the same shape')
+    types = {type(x) for x in values_lists}
+    shapes = {x.shape for x in values_lists}
 
-        if isinstance(t, _sparse.csr_matrix):
-            if values.shape[0] > 1:
-                raise ValueError(('The sparse matrix must have shape 1 row X N'
-                                  ' columns'))
+    if len(types) != 1:
+        raise TypeError('The arrays must all be of the same type')
 
-    if isinstance(t, _sparse.csr_matrix):
+    if len(shapes) != 1:
+        raise ValueError('The arrays must all be of the same shape')
+
+    shape = next(iter(shapes))
+
+    if types == {_sparse.csr_matrix}:
+        if shape[0] > 1:
+            raise ValueError(('The sparse matrix must have shape 1 row X N'
+                              ' columns'))
         if _needs_sparse_unification(values_lists):
             raise ValueError(('The non-zero entries in the sparse arrays'
                               ' must be aligned: see '
                               'bootstrapped.unify_sparse_vectors function'))
+    else:
+        if len(shape) != 1:
+            raise ValueError('numpy.ndarray inputs must have .ndim of 1')
 
 
 def _generate_distributions(values_lists, num_iterations):
