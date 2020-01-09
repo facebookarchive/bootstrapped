@@ -75,12 +75,19 @@ Requirements
 **bootstrapped** requires numpy. The power analysis functions require
 matplotlib and pandas.
 
-Installation
+Installation with pip
 ------------
-
 .. code:: bash
 
     pip install bootstrapped
+    
+Installation from github
+------------   
+.. code:: bash
+
+    git clone https://github.com/facebookincubator/bootstrapped.git
+    cd bootstrapped
+    python setup.py install    
 
 How bootstrapped works
 ----------------------
