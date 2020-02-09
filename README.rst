@@ -98,7 +98,7 @@ For more information please see:
    Methods <http://www.stat-athens.aueb.gr/~karlis/lefkada/boot.pdf>`__
 3. `The Bootstrap, Advanced Data
    Analysis <http://www.stat.cmu.edu/~cshalizi/402/lectures/08-bootstrap/lecture-08.pdf>`__
-4. `When the bootstrap dosen't
+4. `When the bootstrap doesn't
    work <http://notstatschat.tumblr.com/post/156650638586/when-the-bootstrap-doesnt-work>`__
 5. (book) `An Introduction to the
    Bootstrap <https://www.amazon.com/Introduction-Bootstrap-Monographs-Statistics-Probability/dp/0412042312/>`__
